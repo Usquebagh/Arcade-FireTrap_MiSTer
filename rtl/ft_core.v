@@ -16,6 +16,20 @@ module ft_core #(
     input      [19:0] dl_addr,
     input       [7:0] dl_data,
     input             dl_wr,
+    output            dl_wait,
+
+    // SDRAM: graphics reads (64-bit bursts) and download writes
+    output     [22:0] gfx_addr,        // 16-bit word address
+    output            gfx_req,
+    input             gfx_ready,
+    input      [63:0] gfx_data,
+    output reg [22:0] sdw_addr,
+    output reg [15:0] sdw_data,
+    output reg  [1:0] sdw_be,
+    output reg        sdw_req,
+    input             sdw_ready,
+
+    input       [3:0] layer_en,        // FG, sprites, BG1, BG2
 
     // Inputs, active low as on the board
     input       [7:0] in0,             // P1 left stick UDLR, right stick UDLR
@@ -39,7 +53,9 @@ module ft_core #(
 
     // Debug
     output     [15:0] dbg_addr,
-    output            dbg_m1
+    output            dbg_m1,
+    output            dbg_overrun,
+    input             dbg_dump         // simulation only: write RAM contents to files
 );
 
 // ---------------------------------------------------------------- clock enables
@@ -116,6 +132,35 @@ wire dl_prom = dl_wr & (dl_addr >= 20'h2B000) & (dl_addr < 20'h2B300);
 wire [19:0] dl_chr_a  = dl_addr - 20'h29000;
 wire [19:0] dl_prom_a = dl_addr - 20'h2B000;
 
+// Graphics ROMs go to SDRAM, permuted so that one 4-word burst holds a whole 16-pixel tile row
+// (layouts in ft_render). Download order per region: BG1 di-06, di-04, di-07, di-05;
+// BG2 di-09, di-08, di-11, di-10; sprites di-16, di-13, di-14, di-15 (32 KB each).
+wire        dl_gfx  = dl_wr & (dl_addr >= 20'h2C000) & (dl_addr < 20'h8C000);
+wire [19:0] g_off   = dl_addr - 20'h2C000;
+wire  [1:0] g_reg   = g_off[18:17];          // 0 BG1, 1 BG2, 2 sprites
+wire  [1:0] g_c     = g_off[16:15];          // chip within the region
+wire [14:0] g_f     = g_off[14:0];           // offset within the chip
+// BG (MAME tilelayout + ROM_CONTINUE): quarter n = {c[1], f[13]}, q = {c[0], f[14], f[12:0]}
+wire [14:0] g_q     = {g_c[0], g_f[14], g_f[12:0]};
+wire [15:0] g_bgw   = {g_q[14:5], g_q[3:0], g_q[4], g_c[1]};
+// Sprites (one bit plane per chip): o = f
+wire [15:0] g_objw  = {g_f[14:5], g_f[3:0], g_f[4], g_c[1]};
+wire        g_lane  = (g_reg == 2'd2) ? g_c[0] : g_f[13];
+
+reg dl_busy;
+always @(posedge clk) begin
+    sdw_req <= 0;
+    if (dl_gfx & ~dl_busy) begin
+        sdw_addr <= (g_reg == 2'd2) ? {5'd0, 2'b10, g_objw} : {5'd0, 1'b0, g_reg[0], g_bgw};
+        sdw_data <= {dl_data, dl_data};
+        sdw_be   <= g_lane ? 2'b10 : 2'b01;
+        sdw_req  <= 1;
+        dl_busy  <= 1;
+    end else if (sdw_ready)
+        dl_busy <= 0;
+end
+assign dl_wait = dl_busy | dl_gfx;
+
 // ---------------------------------------------------------------- memories
 reg  [1:0] bank;
 // Main ROM: 0x00000-0x07FFF fixed, 0x08000-0x17FFF banks 0-3 (di-01: 0,1; di-00-a: 2,3)
@@ -142,22 +187,35 @@ dpram #(.AW(11)) u_fg_ram (
     .b_addr(fg_vaddr), .b_din(8'h00), .b_we(1'b0), .b_dout(fg_vq)
 );
 
-wire [7:0] bg1_q, bg2_q, obj_q;
+wire  [7:0] bg1_q, bg2_q, obj_q, bg1_vq, bg2_vq, obj_vq;
+wire [10:0] bg1_vaddr, bg2_vaddr;
+wire  [8:0] obj_vaddr;
 dpram #(.AW(11)) u_bg1_ram (
     .clk(clk),
     .a_addr(A[10:0]), .a_din(cpu_dout), .a_we(bg1_cs & vram_wr), .a_dout(bg1_q),
-    .b_addr(11'd0), .b_din(8'h00), .b_we(1'b0), .b_dout()
+    .b_addr(bg1_vaddr), .b_din(8'h00), .b_we(1'b0), .b_dout(bg1_vq)
 );
 dpram #(.AW(11)) u_bg2_ram (
     .clk(clk),
     .a_addr(A[10:0]), .a_din(cpu_dout), .a_we(bg2_cs & vram_wr), .a_dout(bg2_q),
-    .b_addr(11'd0), .b_din(8'h00), .b_we(1'b0), .b_dout()
+    .b_addr(bg2_vaddr), .b_din(8'h00), .b_we(1'b0), .b_dout(bg2_vq)
 );
 dpram #(.AW(9)) u_obj_ram (
     .clk(clk),
     .a_addr(A[8:0]), .a_din(cpu_dout), .a_we(obj_cs & ~wr_n), .a_dout(obj_q),
-    .b_addr(9'd0), .b_din(8'h00), .b_we(1'b0), .b_dout()
+    .b_addr(obj_vaddr), .b_din(8'h00), .b_we(1'b0), .b_dout(obj_vq)
 );
+
+`ifdef SIMULATION
+// RAM dump for comparisons with MAME (sim_main pulses dbg_dump)
+always @(posedge clk) if (dbg_dump) begin
+    $writememh("ram_c000.hex", u_ram.mem);
+    $writememh("ram_d000.hex", u_bg1_ram.mem);
+    $writememh("ram_d800.hex", u_bg2_ram.mem);
+    $writememh("ram_e000.hex", u_fg_ram.mem);
+    $writememh("ram_e800.hex", u_obj_ram.mem);
+end
+`endif
 
 // ---------------------------------------------------------------- I/O writes (sheet 16)
 // Board latches clock on the rising (trailing) edge of the decoded write strobe.
@@ -182,6 +240,9 @@ always @(posedge clk) begin
         flip   <= 0;
         nmi_en <= 0;
     end else if (io_end) begin
+`ifdef FT_TRACE_IO
+        $display("IO W F00%x = %02x  line %0d", io_a_l, io_d_l, u_video.vc);
+`endif
         case (io_a_l)
         4'h1: sound_latch <= io_d_l;
         4'h2: bank        <= io_d_l[1:0];
@@ -287,12 +348,28 @@ ft_video #(.CHR_INIT(CHR_INIT), .PROM_INIT(PROM_INIT)) u_video (
     .rst        ( reset      ),
     .ph         ( ph         ),
     .flip       ( flip       ),
+    .bg1_sx     ( scroll[0]  ),
+    .bg1_sy     ( scroll[1]  ),
+    .bg2_sx     ( scroll[2]  ),
+    .bg2_sy     ( scroll[3]  ),
     .hc         (            ),
     .vc         (            ),
     .hblank_now ( hblank_now ),
     .vblank_now ( vblank_now ),
     .fg_addr    ( fg_vaddr   ),
     .fg_q       ( fg_vq      ),
+    .bg1_addr   ( bg1_vaddr  ),
+    .bg1_q      ( bg1_vq     ),
+    .bg2_addr   ( bg2_vaddr  ),
+    .bg2_q      ( bg2_vq     ),
+    .obj_addr   ( obj_vaddr  ),
+    .obj_q      ( obj_vq     ),
+    .gfx_addr   ( gfx_addr   ),
+    .gfx_req    ( gfx_req    ),
+    .gfx_ready  ( gfx_ready  ),
+    .gfx_data   ( gfx_data   ),
+    .layer_en   ( layer_en   ),
+    .render_overrun ( dbg_overrun ),
     .chr_waddr  ( dl_chr_a[12:0]  ),
     .chr_wdata  ( dl_data    ),
     .chr_we     ( dl_chr     ),
