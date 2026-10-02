@@ -1,0 +1,31 @@
+# Never commit ROMs or manuals
+*.zip
+*.rom
+*.bin
+roms/
+*.pdf
+
+# Build / simulation output
+output_files/
+db/
+incremental_db/
+sim/obj_dir/
+sim/out/
+*.vcd
+*.fst
+build.log
+build_id.v
+*.qws
+*.rpt
+*.summary
+*.done
+*.smsg
+*.jdi
+*.sld
+*.pin
+*.sof
+c5_pin_model_dump.txt
+jtag.cdf
+commit_*.sh
+cleanup.sh
+precheck.sh
