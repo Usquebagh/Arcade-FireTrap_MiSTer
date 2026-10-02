@@ -87,18 +87,22 @@ The 11.9911 MHz measurement is 0.07 % slow — ignore it (57.40 Hz vs 57.44 Hz).
   Q̄ drives `/INT` directly. (The coin input and the 6C gate that once ORed into `/INT` are crossed
   out.) MAME asserts on the *falling* edge of P3.0. Which edge matters only if the MCU holds P3.0
   low for a long time; check the MCU code (look at what it does around `CLR P3.0` / `SETB P3.0`).
-- **NMI**: VBLK-clocked flip-flop gated by the F004 enable. Working model (= MAME's behaviour):
-  NMI goes active at VBLANK start if enabled; writing F004 with D0 = 1 disables and clears it.
-  The Z80 NMI is edge-triggered, so it must be released before the next frame (it is released
-  at the end of VBLANK).
+- **NMI**: 4C holds the F004 enable (D0 = 1 disables); 5C latches it on `VBLK` rising and 3B
+  ORs it with the delayed `*VBLK`, so NMI is active from the start of VBLANK to its end if NMI
+  was enabled at VBLANK start. This gives one NMI edge per frame without the game having to
+  toggle F004, which matches the firmware: it writes F004 = 1 once at boot and F004 = 0 at the
+  end of the NMI handler (a task scheduler at 0124).
 - **Wait states (`*WAIT`, sheet 17, not in MAME)**: 3C (F74) samples `VRAM` (CPU address in
   D000–E7FF, generated on sheet 15 by 2C/6F) on `*HCLK`; its Q̄ drives `/WAIT`, and its Q gates
   the CPU's chip selects to BG1/BG2/FIX RAM (1C). Its reset comes from 6C (`*HBLK`, `*VBLK`).
   Working model: **the Z80 only gets the tile RAMs during blanking**. An access during active
   display waits until the next HBLANK or VBLANK. Sprite RAM (E800) is not included. The 6C gate
-  is drawn as a NOR, which taken literally does not give a sensible function. Before
-  implementing, measure how often the game touches D000–E7FF outside VBLANK (Z80 trace in
-  MAME). If it never does, the wait logic is irrelevant to timing and can be a simple model.
+  is drawn as a NOR, which taken literally does not give a sensible function.
+  It matters: a MAME write tap (attract mode, frames 200–1400) shows ~127 tile-RAM writes per
+  frame spread over the whole frame, i.e. almost all of them would fall in the board's active
+  display. In simulation the wait delays the boot-time title drawing by ~5 frames; in-game the
+  work still fits in a frame, so the sim stays frame-aligned with MAME. The core implements it
+  (`VRAM_WAIT` parameter, default on).
 
 ## Protection MCU — i8751H @ 8 MHz (sheet 26)
 
@@ -121,10 +125,15 @@ concurrently):
 - MAME clears INT0 on a *falling edge* of P3.1. On the board, P3.1 is the flip-flop's **reset
   level**: while P3.1 is low, a Z80 write to F005 cannot set INT0.
 - MAME pulses INT1 for one scanline at line 0. On the board, INT1 = `*VBLK` (low for the whole of
-  VBLANK, from line 248). Whether this matters depends on IT1 (edge vs level) in TCON; check the
-  MCU code.
+  VBLANK, from line 248). The firmware sets `TCON = 05h` (IT0 = IT1 = 1, both falling-edge), so
+  the MCU's VBLANK interrupt fires once at line 248.
 - MAME models P0.0 as "all coins released" logic; the board has a real flip-flop that the MCU
-  must clear with P3.4. Model the flip-flop.
+  must clear with P3.4. Model the flip-flop. The firmware's VBLANK handler tests P0.0 (low = a
+  coin switch has closed), samples P0.1–P0.3 to see which, pulses P3.4 to clear the latch, and
+  credits the coin once the switch has opened again (debounced over a few frames).
+- Command protocol (INT0 handler at 0034): pulse P3.1 (clears the INT0 latch), read the command
+  from P2, reply with bytes on P1, each followed by a P3.0 low→high pulse (Z80 IRQ). At boot the
+  Z80 sends command 13h repeatedly to fetch a table from the MCU ROM.
 
 The MCU ROM is in the set (`di-12.16h` US, `fi-13.16h` JP), so no simulation of the protection
 is needed: the jt8051 core runs it.
@@ -292,11 +301,12 @@ Total 0x8C000 = 573,440 bytes.
 
 ## Open items
 
-1. Exact polarity of the Z80 VRAM wait logic (6C); measure how much it matters with a MAME trace.
+1. Exact polarity of the Z80 VRAM wait logic (6C). It does affect timing (see above); only a
+   real board could confirm it.
 2. Which sprite attribute bit is `PRO` (priority), and whether the game sets it.
 3. Per-line sprite limit of the DSPC-10.
 4. HBLANK/HSYNC/VSYNC edge positions inside the DECO customs (use MAME's 0–255 / 8–247 visible
    area; sync positions chosen for a standard 15 kHz picture).
-5. MCU INT1 edge/level mode and the IRQ edge (rising per schematic vs falling per MAME) —
-   read the MCU code.
+5. ~~MCU INT1 edge/level mode and the IRQ edge~~ — resolved from the firmware (see the MCU
+   section); the P3.0 pulse is one instruction long, so rising vs falling edge does not matter.
 6. Single-stick cabinet behaviour (needs a MAME test; no documentation found yet).
