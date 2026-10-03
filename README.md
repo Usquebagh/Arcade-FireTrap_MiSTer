@@ -91,15 +91,16 @@ to the game.
 
 **Cheats** (OSD **Cheats** menu): P1/P2 Infinite Lives, P1/P2 Infinite Time and the 3-Way
 Powerup, converted from the MAME cheat file. Like MAME's, they write the value into RAM once per
-frame.
+frame. *Infinite Time* stops the music from resetting after a stage clear (see Known issues).
 
 ---
 
 ## Known issues
 
-- **Stage-clear music keeps playing** into the next stage and the sound effects stop, when the
-  *Infinite Time* cheat is on. The end-of-stage bonus counts the timer down to zero, which the
-  cheat prevents. Still being confirmed; leave Infinite Time off for now.
+- **Cheats can break the music after a stage clear:** with *Infinite Time* on, the music that
+  plays while the firefighter descends after clearing a stage keeps playing into the next stage,
+  and the sound effects stop. The end-of-stage bonus counts the timer down to zero, which the
+  cheat prevents. Without cheats the sound is fine.
 - **Single Stick** climbing is slower than climbing with two sticks.
 - The **Fire Trap (US)** and **Fire Trap (Japan)** MRAs have not been tested yet.
 
