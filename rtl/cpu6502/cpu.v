@@ -854,9 +854,9 @@ always @(posedge clk )
     if( RDY )
         DIHOLD <= DI;
 
-// Jedi core: RDY is used as a clock enable and DI is supplied from a register that is
-// only updated on enabled cycles (see jedi_cpu_bus in jedi_core.v), so DI already holds
-// the data for the previous cycle's address for the whole stall. Original:
+// Modified: RDY is used as a clock enable and DI is supplied from a register that is
+// only updated on enabled cycles (see ft_sound.v), so DI already holds the data for the
+// previous cycle's address for the whole stall. Original:
 // assign DIMUX = ~RDY ? DIHOLD : DI;
 assign DIMUX = DI;
 

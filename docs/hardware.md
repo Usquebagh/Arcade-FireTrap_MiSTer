@@ -295,7 +295,7 @@ Total 0x8C000 = 573,440 bytes.
 |---|---|---|
 | Z80 | T80 (jtframe copy, VHDL → Verilog via GHDL/Yosys for Verilator) | BSD-style |
 | i8751 | jt8051 (jotego) | GPL-3.0 |
-| 6502 | Arlet Ottens' verilog-6502 (as in the Jedi core) | free |
+| 6502 | Arlet Ottens' verilog-6502 (RDY used as a clock enable) | free |
 | YM3526 | jtopl (jotego) | GPL-3.0 |
 | MSM5205 | jt5205 (jotego) | GPL-3.0 |
 

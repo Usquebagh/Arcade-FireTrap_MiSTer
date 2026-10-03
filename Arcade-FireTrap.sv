@@ -134,7 +134,7 @@ wire rom_download  = ioctl_download && ioctl_index == 0;
 wire code_download = ioctl_download && ioctl_index == 255;
 
 // Cheat codes from the MRA <cheats> section: 16 bytes per code, shifted in MSB first;
-// bit 128 strobes each complete code into the engine (as in the Jedi and Irem M92 cores).
+// bit 128 strobes each complete code into the engine (as in the Irem M92 core).
 reg [128:0] cheat_code = 0;
 always @(posedge clk_sys) begin
 	cheat_code[128] <= 1'b0;
