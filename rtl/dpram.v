@@ -1,5 +1,7 @@
 // Generic true dual-port synchronous RAM/ROM (infers M10K block RAM on Cyclone V).
-// Both ports: registered read, write-first not required. Optional $readmemh init (simulation).
+// Both ports: registered read; a port that writes returns the written data (the Altera
+// true-dual-port template - "old data" read-during-write cannot be inferred when both ports
+// write). Optional $readmemh init (simulation).
 module dpram #(
     parameter AW    = 10,
     parameter DW    = 8,
@@ -24,13 +26,19 @@ reg [DW-1:0] mem [0:DEPTH-1];
 initial if (INIT != "") $readmemh(INIT, mem);
 
 always @(posedge clk) begin
-    if (a_we) mem[a_addr] <= a_din;
-    a_dout <= mem[a_addr];
+    if (a_we) begin
+        mem[a_addr] <= a_din;
+        a_dout <= a_din;
+    end else
+        a_dout <= mem[a_addr];
 end
 
 always @(posedge clk) begin
-    if (b_we) mem[b_addr] <= b_din;
-    b_dout <= mem[b_addr];
+    if (b_we) begin
+        mem[b_addr] <= b_din;
+        b_dout <= b_din;
+    end else
+        b_dout <= mem[b_addr];
 end
 
 endmodule

@@ -31,6 +31,10 @@ module ft_core #(
 
     input       [3:0] layer_en,        // FG, sprites, BG1, BG2
 
+    // Cheats (MRA <cheats>, applied to Z80 reads)
+    input     [128:0] cheat_code,
+    input             cheat_reset,
+
     // Inputs, active low as on the board
     input       [7:0] in0,             // P1 left stick UDLR, right stick UDLR
     input       [7:0] in1,             // P2 (cocktail)
@@ -75,7 +79,7 @@ wire cen_mcu = (mcu_div == 3'd0);
 // ---------------------------------------------------------------- Z80
 wire [15:0] A;
 wire  [7:0] cpu_dout;
-reg   [7:0] cpu_din;
+reg   [7:0] cpu_din, bus_q;
 wire        mreq_n, rd_n, wr_n, m1_n, rfsh_n, iorq_n;
 wire        int_n, nmi_n, wait_n;
 
@@ -179,10 +183,13 @@ dpram #(.AW(17), .DEPTH(17'h18000), .INIT(MAIN_ROM_INIT)) u_main_rom (
 );
 
 wire [7:0] ram_q;
+wire [11:0] poke_addr;
+wire  [7:0] poke_data, poke_q;
+wire        poke_we;
 dpram #(.AW(12)) u_ram (
     .clk(clk),
     .a_addr(A[11:0]), .a_din(cpu_dout), .a_we(ram_cs & ~wr_n), .a_dout(ram_q),
-    .b_addr(12'd0), .b_din(8'h00), .b_we(1'b0), .b_dout()
+    .b_addr(poke_addr), .b_din(poke_data), .b_we(poke_we), .b_dout(poke_q)   // cheat pokes
 );
 
 wire [10:0] fg_vaddr;
@@ -329,26 +336,43 @@ ft_mcu #(.ROM_INIT(MCU_ROM_INIT)) u_mcu (
 
 // ---------------------------------------------------------------- CPU read mux
 always @(*) begin
-    cpu_din = 8'hff;
-    if (rom_cs | bnk_cs) cpu_din = rom_q;
-    else if (ram_cs)     cpu_din = ram_q;
-    else if (bg1_cs)     cpu_din = bg1_q;
-    else if (bg2_cs)     cpu_din = bg2_q;
-    else if (fg_cs)      cpu_din = fg_q;
-    else if (obj_cs)     cpu_din = obj_q;
+    bus_q = 8'hff;
+    if (rom_cs | bnk_cs) bus_q = rom_q;
+    else if (ram_cs)     bus_q = ram_q;
+    else if (bg1_cs)     bus_q = bg1_q;
+    else if (bg2_cs)     bus_q = bg2_q;
+    else if (fg_cs)      bus_q = fg_q;
+    else if (obj_cs)     bus_q = obj_q;
     else if (io_rd) begin
         case (A[2:0])
-        3'd0: cpu_din = in0;
-        3'd1: cpu_din = in1;
-        3'd2: cpu_din = {vblank_now, 3'b111, in2};
-        3'd3: cpu_din = dsw0;
-        3'd4: cpu_din = dsw1;
-        3'd5: cpu_din = {5'b11111, mcu_p3_o[0], 2'b11};  // F015: P3.0 (bit position unverified)
-        3'd6: cpu_din = mcu_p1_o;
-        default: cpu_din = 8'hff;
+        3'd0: bus_q = in0;
+        3'd1: bus_q = in1;
+        3'd2: bus_q = {vblank_now, 3'b111, in2};
+        3'd3: bus_q = dsw0;
+        3'd4: bus_q = dsw1;
+        3'd5: bus_q = {5'b11111, mcu_p3_o[0], 2'b11};  // F015: P3.0 (bit position unverified)
+        3'd6: bus_q = mcu_p1_o;
+        default: bus_q = 8'hff;
         endcase
     end
 end
+
+// Cheats substitute read data (MRA <cheats>); registered, the Z80 samples DI several clocks later
+wire [7:0] bus_cheat;
+ft_cheats u_cheats (
+    .clk   ( clk         ),
+    .reset ( cheat_reset ),
+    .code  ( cheat_code  ),
+    .addr  ( A           ),
+    .din   ( bus_q       ),
+    .dout  ( bus_cheat   ),
+    .frame ( vblank_now & ~vbl_l ),
+    .poke_addr ( poke_addr ),
+    .poke_data ( poke_data ),
+    .poke_we   ( poke_we   ),
+    .poke_q    ( poke_q    )
+);
+always @(posedge clk) cpu_din <= bus_cheat;
 
 // ---------------------------------------------------------------- sound board
 reg snd_wr;

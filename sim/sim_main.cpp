@@ -10,11 +10,15 @@
 //   DSW=hhhh             DSW1:DSW0 (default ffdf = MAME defaults)
 //   LAYERS=h             layer enables {BG2, BG1, sprites, FG} (default f)
 //   PC_FROM=f PC_TO=g    print Z80 opcode fetch addresses for frames [f, g)
-//   RAMDUMP=f            write ram_*.hex (C000, D000, D800, E000, E800) at frame f
+//   RAMDUMP=f,g,...      write ram_<base>_<frame>.hex (C000, D000, D800, E000, E800) at those frames
+//   SINGLE=1             P1 single-stick mode (left stick in IN0 bits 0-3 drives both sticks)
+//   CHEATS=code,code     cheat codes as in the MRA (32 hex digits each, spaces allowed)
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <string>
+#include <cctype>
 #include "Vsim_top.h"
 #include "verilated.h"
 
@@ -51,6 +55,7 @@ int main(int argc, char **argv) {
     top->dsw0 = dsw & 0xff;
     top->dsw1 = (dsw >> 8) & 0xff;
     top->layer_en = getenv("LAYERS") ? strtoul(getenv("LAYERS"), nullptr, 16) : 0xf;
+    top->single = getenv("SINGLE") ? atoi(getenv("SINGLE")) : 0;
 
     std::vector<std::pair<int, unsigned>> script;
     if (const char *s = getenv("INPUTS")) {
@@ -83,6 +88,26 @@ int main(int argc, char **argv) {
         while (top->dl_wait) tick();
     }
     for (int i = 0; i < 200; i++) tick();
+
+    // Cheat codes (while still in reset): pulse cheat_reset, then strobe each code
+    if (const char *s = getenv("CHEATS")) {
+        top->cheat_reset = 1; tick(); top->cheat_reset = 0; tick();
+        std::string all(s);
+        size_t start = 0;
+        while (start < all.size()) {
+            size_t end = all.find(',', start);
+            if (end == std::string::npos) end = all.size();
+            std::string hex;
+            for (size_t i = start; i < end; i++) if (isxdigit((unsigned char)all[i])) hex += all[i];
+            if (hex.size() == 32) {
+                for (int w = 0; w < 4; w++)   // word 3 = first 8 hex digits (bits 127:96)
+                    top->cheat_code[3 - w] = (uint32_t)strtoul(hex.substr(w * 8, 8).c_str(), nullptr, 16);
+                top->cheat_code[4] = 1; tick(); top->cheat_code[4] = 0; tick();
+                printf("cheat loaded: %s\n", hex.c_str());
+            }
+            start = end + 1;
+        }
+    }
     top->reset = 0;
 
     // Audio: 48 kHz (48 MHz / 1000, box-filtered), signed 16-bit mono to audio.raw
@@ -125,9 +150,17 @@ int main(int argc, char **argv) {
             while (next_input < script.size() && script[next_input].first <= frame)
                 set_inputs(script[next_input++].second);
             if (frame % 50 == 0) printf("frame %4d  addr %04x\n", frame, top->dbg_addr);
-            if (getenv("RAMDUMP") && frame == atoi(getenv("RAMDUMP"))) {
-                top->dbg_dump = 1; tick(); top->dbg_dump = 0;
-                printf("RAM dumped at frame %d\n", frame);
+            if (const char *rd = getenv("RAMDUMP")) {      // comma list of frames
+                std::string list = std::string(",") + rd + ",";
+                if (list.find("," + std::to_string(frame) + ",") != std::string::npos) {
+                    top->dbg_dump = 1; tick(); top->dbg_dump = 0;
+                    for (const char *n : {"c000", "d000", "d800", "e000", "e800"}) {
+                        std::string a = std::string("ram_") + n + ".hex";
+                        std::string b = std::string("ram_") + n + "_" + std::to_string(frame) + ".hex";
+                        rename(a.c_str(), b.c_str());
+                    }
+                    printf("RAM dumped at frame %d\n", frame);
+                }
             }
             if (frame % every == 0 || frame >= from) {
                 char name[64];

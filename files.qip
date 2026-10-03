@@ -48,6 +48,8 @@ set_global_assignment -name VERILOG_FILE rtl/jt5205/jt5205_timing.v
 set_global_assignment -name VERILOG_FILE rtl/jt5205/jt5205_interpol2x.v
 set_global_assignment -name VERILOG_FILE rtl/dpram.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram.sv
+set_global_assignment -name VERILOG_FILE rtl/ft_cheats.v
+set_global_assignment -name VERILOG_FILE rtl/ft_inputs.v
 set_global_assignment -name VERILOG_FILE rtl/ft_mcu.v
 set_global_assignment -name VERILOG_FILE rtl/ft_sound.v
 set_global_assignment -name VERILOG_FILE rtl/ft_render.v

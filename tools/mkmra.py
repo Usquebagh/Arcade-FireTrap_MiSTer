@@ -99,6 +99,16 @@ for title, setname, parent, region, zips, main, snd, mcu, chars, proms, gfx in S
 		<!-- 2C000 BG1, 4C000 BG2, 6C000 sprites (to SDRAM) -->
 {parts(gfx)}
 	</rom>
+
+	<!-- Cheats converted from the MAME cheat file (https://www.mamecheat.co.uk; same addresses
+	     in all sets). Format: flags(4) address(4) compare(4) value(4); applied to Z80 reads. -->
+	<cheats>
+		<cheat name="P1 Infinite Lives">000000 10 0000C143 00000000 00000008</cheat>
+		<cheat name="P1 Infinite Time">000000 10 0000C149 00000000 0000009A</cheat>
+		<cheat name="P2 Infinite Lives">000000 10 0000C151 00000000 00000008</cheat>
+		<cheat name="P2 Infinite Time">000000 10 0000C157 00000000 0000009A</cheat>
+		<cheat name="3-Way Powerup">000000 10 0000C145 00000000 00000002</cheat>
+	</cheats>
 </misterromdescription>
 """
     os.makedirs("releases", exist_ok=True)

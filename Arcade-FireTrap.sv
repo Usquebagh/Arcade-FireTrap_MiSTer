@@ -53,9 +53,12 @@ localparam CONF_STR = {
 	"O[5:3],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
 	"O[8],Joysticks,Twin Stick,Single Stick;",
+	"O[14:13],Single Stick Climb,32 Frames,24 Frames,40 Frames;",
 	"O[9],4-Way Filter,On,Off;",
 	"-;",
 	"DIP;",
+	"-;",
+	"C,Cheats;",
 	"-;",
 	"P1,Advanced;",
 	"P1-;",
@@ -127,7 +130,20 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.joystick_r_analog_1(joy_r1)
 );
 
-wire rom_download = ioctl_download && ioctl_index == 0;
+wire rom_download  = ioctl_download && ioctl_index == 0;
+wire code_download = ioctl_download && ioctl_index == 255;
+
+// Cheat codes from the MRA <cheats> section: 16 bytes per code, shifted in MSB first;
+// bit 128 strobes each complete code into the engine (as in the Jedi and Irem M92 cores).
+reg [128:0] cheat_code = 0;
+always @(posedge clk_sys) begin
+	cheat_code[128] <= 1'b0;
+	if (code_download & ioctl_wr) begin
+		cheat_code[127:0] <= {cheat_code[119:0], ioctl_dout};
+		cheat_code[128]   <= &ioctl_addr[3:0];
+	end
+end
+wire cheat_reset = code_download && ioctl_wr && ioctl_addr == 0;
 wire reset = RESET | status[0] | buttons[1] | rom_download | ~pll_locked;
 
 // DIP switches from the MRA (ioctl index 254): byte 0 = SW1 (DSW0), byte 1 = SW2 (DSW1)
@@ -135,11 +151,17 @@ reg [7:0] sw[2];
 always @(posedge clk_sys)
 	if (ioctl_wr && ioctl_index == 254 && !ioctl_addr[24:1]) sw[ioctl_addr[0]] <= ioctl_dout;
 
+wire [7:0] r, g, b;
+wire       hs, vs, hbl, vbl, ce_pix, flip_screen;
+
 ////////////////////   INPUTS   ///////////////////
-// Each player has two 4-way sticks (left: movement, right: water direction) and one button.
-// Left stick: d-pad or left analog stick. Right stick: right analog stick or the buttons
-// mapped to R-Stick Up/Down/Left/Right. "Single Stick" drives both sticks from the left one,
-// which is how one-joystick cabinets play (climbing = both sticks the same way).
+// Each player has two 4-way sticks and one button. Climbing is hand over hand, as in Crazy
+// Climber: alternate (left up, right down) and (left down, right up); both sticks left/right
+// move sideways. Left stick: d-pad or left analog stick. Right stick: right analog stick or the
+// buttons mapped to R-Stick Up/Down/Left/Right.
+// "Single Stick": one joystick drives both. Holding up alternates the hands automatically every
+// N frames (MAME test: the climb speed levels off at about 40 frames per swap); other
+// directions go to both sticks.
 
 // Analog stick -> {up, down, left, right} with a threshold of half deflection
 function [3:0] analog_dirs(input [15:0] a);
@@ -154,11 +176,22 @@ wire [3:0] p1_r = {joy0[5], joy0[6], joy0[7], joy0[8]} | analog_dirs(joy_r0);
 wire [3:0] p2_r = {joy1[5], joy1[6], joy1[7], joy1[8]} | analog_dirs(joy_r1);
 
 wire single = status[8];
-wire [3:0] p1_l4, p2_l4, p1_r4, p2_r4;
-ft_4way f1l (.clk(clk_sys), .enable(~status[9]), .in(p1_l), .out(p1_l4));
-ft_4way f2l (.clk(clk_sys), .enable(~status[9]), .in(p2_l), .out(p2_l4));
-ft_4way f1r (.clk(clk_sys), .enable(~status[9]), .in(single ? p1_l : p1_r), .out(p1_r4));
-ft_4way f2r (.clk(clk_sys), .enable(~status[9]), .in(single ? p2_l : p2_r), .out(p2_r4));
+wire [3:0] p1_lf, p2_lf, p1_rf, p2_rf, p1_l4, p2_l4, p1_r4, p2_r4;
+ft_4way f1l (.clk(clk_sys), .enable(~status[9]), .in(p1_l), .out(p1_lf));
+ft_4way f2l (.clk(clk_sys), .enable(~status[9]), .in(p2_l), .out(p2_lf));
+ft_4way f1r (.clk(clk_sys), .enable(~status[9]), .in(p1_r), .out(p1_rf));
+ft_4way f2r (.clk(clk_sys), .enable(~status[9]), .in(p2_r), .out(p2_rf));
+
+// Single-stick climbing: swap every 32 (default), 24 or 40 frames
+wire [5:0] climb_n = status[14:13] == 2'd1 ? 6'd24 : status[14:13] == 2'd2 ? 6'd40 : 6'd32;
+reg vbl_l;
+always @(posedge clk_sys) vbl_l <= vbl;
+wire frame = vbl & ~vbl_l;
+
+ft_single s1 (.clk(clk_sys), .frame(frame), .n(climb_n), .single(single),
+              .l_in(p1_lf), .r_in(p1_rf), .l_out(p1_l4), .r_out(p1_r4));
+ft_single s2 (.clk(clk_sys), .frame(frame), .n(climb_n), .single(single),
+              .l_in(p2_lf), .r_in(p2_rf), .l_out(p2_l4), .r_out(p2_r4));
 
 // IN0/IN1 bits 0-3 = left stick up, down, left, right; 4-7 = right stick (all active low)
 function [7:0] stick_port(input [3:0] l, input [3:0] r);
@@ -172,8 +205,6 @@ wire [2:0] coin = ~{joy1[10], joy0[10], 1'b0};               // coin 2, coin 1, 
 
 ////////////////////   CORE   ///////////////////
 
-wire [7:0] r, g, b;
-wire       hs, vs, hbl, vbl, ce_pix, flip_screen;
 wire signed [15:0] audio;
 
 wire [22:0] gfx_addr, sdw_addr;
@@ -204,6 +235,8 @@ ft_core core
 	.sdw_ready(sdw_ready),
 
 	.layer_en(4'hf),
+	.cheat_code(cheat_code),
+	.cheat_reset(cheat_reset),
 
 	.in0(in0),
 	.in1(in1),
@@ -350,32 +383,5 @@ assign AUDIO_S   = 1;
 assign AUDIO_MIX = 0;
 
 assign LED_USER = ioctl_download;
-
-endmodule
-
-// 4-way joystick filter (MAME PORT_4WAY): when two directions are held, the one pressed
-// most recently wins.
-module ft_4way
-(
-	input            clk,
-	input            enable,
-	input      [3:0] in,      // up, down, left, right
-	output     [3:0] out
-);
-
-reg [3:0] in_l, out_r;
-wire [3:0] newly = in & ~in_l;
-wire onehot_in  = (in    != 0) && ((in    & (in    - 4'd1)) == 0);
-wire onehot_new = (newly != 0) && ((newly & (newly - 4'd1)) == 0);
-
-always @(posedge clk) begin
-	in_l <= in;
-	if (in == 0)                 out_r <= 0;
-	else if (onehot_in)          out_r <= in;
-	else if (onehot_new)         out_r <= newly;
-	else if ((out_r & in) == 0)  out_r <= in[3] ? 4'b1000 : in[2] ? 4'b0100 : in[1] ? 4'b0010 : 4'b0001;
-end
-
-assign out = enable ? out_r : in;
 
 endmodule

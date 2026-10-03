@@ -28,8 +28,9 @@ Notes on the hardware and design decisions are in [docs/hardware.md](docs/hardwa
 
 ## Controls
 
-Each player has two 4-way joysticks: the **left** stick climbs, the **right** stick aims the
-water. Climbing is done by pushing both sticks the same way.
+Each player has two 4-way joysticks, one per hand. As in Crazy Climber, you climb hand over
+hand: alternate *left up + right down* and *left down + right up*. Pushing both sticks left or
+right moves sideways.
 
 | Input | Function |
 |---|---|
@@ -38,9 +39,16 @@ water. Climbing is done by pushing both sticks the same way.
 | **R** | Fire (also needed to enter high-score initials) |
 | **Start / Select** | Start / Coin |
 
-**Joysticks** in the OSD: *Twin Stick* (default) or *Single Stick*, where the left stick drives
-both sticks, as on single-joystick cabinets. **4-Way Filter** keeps diagonals out, as the
-original 4-way sticks did.
+**Joysticks** in the OSD: *Twin Stick* (default) or *Single Stick*. In Single Stick mode one
+stick does everything: hold **up** to climb (the core alternates the hands for you; *Single Stick
+Climb* sets the pace, 32 frames per hand by default), left/right/down go to both sticks.
+**4-Way Filter** keeps diagonals out, as the original 4-way sticks did.
+
+MiSTer's *Define joystick buttons* only asks for the d-pad and the buttons; the left analog stick
+always works as the left stick, and the right analog stick as the right one.
+
+**Cheats** (OSD *Cheats*): infinite lives, infinite time and the 3-way power-up, from the MAME
+cheat file. Like MAME's, they are written into RAM once per frame.
 
 **Service Mode:** set *Service Mode* in the DIP switches page and reset.
 
