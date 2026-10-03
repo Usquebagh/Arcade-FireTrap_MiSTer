@@ -3,10 +3,16 @@
 An FPGA implementation of Wood Place's **Fire Trap** (licensed in the US by Data East) for the
 [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer/wiki) platform.
 
-Climb burning skyscrapers as a firefighter, dodging falling debris and putting out fires with
-your hose. Each hand gets its own joystick: one climbs, the other aims the water.
+A burning skyscraper and a firefighter with a hose: climb the building hand over hand, Crazy
+Climber style, and put out the fires on your way to the top.
 
-> **Early build, not yet tested on hardware.** Feedback and bug reports are welcome via
+<p align="center">
+  <img src="docs/title.png" alt="Fire Trap title screen" height="380">
+  <img src="docs/stage1.png" alt="Fire Trap stage 1" height="380">
+</p>
+
+> **Early build.** Playable and tested on MiSTer over HDMI; a few issues are still being worked
+> on (see [Known issues](#known-issues)). Feedback and bug reports are welcome via
 > [Issues](https://github.com/Usquebagh/Arcade-FireTrap_MiSTer/issues).
 
 ---
@@ -16,11 +22,12 @@ your hose. Each hand gets its own joystick: one climbs, the other aims the water
 | Subsystem | Original Hardware | FPGA Implementation |
 |---|---|---|
 | **Main CPU** | Zilog Z80B @ 6 MHz | T80 |
-| **Protection MCU** | Intel 8751 @ 8 MHz | jt8051 (Jose Tejada) |
+| **Protection MCU** | Intel 8751 @ 8 MHz (coins, and data the game fetches at boot) | jt8051 (Jose Tejada), running the original MCU program |
 | **Sound CPU** | MOS 6502 @ 1.5 MHz | Arlet Ottens' verilog-6502 |
-| **Sound** | Yamaha YM3526 + OKI MSM5205 ADPCM | jtopl, jt5205 (Jose Tejada) |
-| **Video** | Text layer, two scrolling 16×16 tile layers, 96 sprites, priority and palette PROMs | `ft_video.v`, `ft_render.v`, from the schematics |
-| **Display** | 256×240, vertical (ROT90), 57.4 Hz | Rotated via the MiSTer framebuffer |
+| **Sound** | Yamaha YM3526 (OPL) + OKI MSM5205 ADPCM | jtopl, jt5205 (Jose Tejada) |
+| **Video** | Text layer, two scrolling 16×16 tile layers, 96 sprites, priority and palette PROMs, DECO custom chips | `ft_video.v`, `ft_render.v`, from the schematics |
+| **Display** | 256 × 240, vertical (ROT90), 57.4 Hz | Rotated with the MiSTer framebuffer; graphics ROMs in SDRAM |
+| **Controls** | Two 4-way joysticks and one button per player | D-pad / analog sticks, or single-stick mode |
 
 Notes on the hardware and design decisions are in [docs/hardware.md](docs/hardware.md).
 
@@ -28,55 +35,113 @@ Notes on the hardware and design decisions are in [docs/hardware.md](docs/hardwa
 
 ## Controls
 
-Each player has two 4-way joysticks, one per hand. As in Crazy Climber, you climb hand over
-hand: alternate *left up + right down* and *left down + right up*. Pushing both sticks left or
-right moves sideways.
+The arcade panel has **two 4-way joysticks**, one for each hand, and one red **PUSH** button.
+
+| Action | On the arcade sticks |
+|---|---|
+| **Climb up** | Hand over hand, as in Crazy Climber: *left up + right down*, then *left down + right up*, and repeat. Pushing both sticks up does nothing. |
+| **Move sideways** | Both sticks left, or both sticks right |
+| **Spray water** | The **Fire** button |
+| **High-score initials** | The **Fire** button is needed to enter them |
+
+On a MiSTer pad:
 
 | Input | Function |
 |---|---|
-| **D-Pad / Left Analog** | Left stick |
+| **D-Pad** or **Left Analog** | Left stick |
 | **Right Analog**, or **X / B / Y / A** | Right stick (up / down / left / right) |
-| **R** | Fire (also needed to enter high-score initials) |
-| **Start / Select** | Start / Coin |
+| **R** | Fire |
+| **Start** | Start |
+| **Select** | Coin |
 
-**Joysticks** in the OSD: *Twin Stick* (default) or *Single Stick*. In Single Stick mode one
-stick does everything: hold **up** to climb (the core alternates the hands for you; *Single Stick
-Climb* sets the pace, 32 frames per hand by default), left/right/down go to both sticks.
-**4-Way Filter** keeps diagonals out, as the original 4-way sticks did.
+The left analog stick always works as the left stick and the right analog stick as the right
+one; MiSTer's *Define joystick buttons* only asks for the d-pad and the buttons above.
 
-MiSTer's *Define joystick buttons* only asks for the d-pad and the buttons; the left analog stick
-always works as the left stick, and the right analog stick as the right one.
+### Single Stick mode
 
-**Cheats** (OSD *Cheats*): infinite lives, infinite time and the 3-way power-up, from the MAME
-cheat file. Like MAME's, they are written into RAM once per frame.
+Set **Joysticks → Single Stick** in the OSD to play with one joystick (or a d-pad):
 
-**Service Mode:** set *Service Mode* in the DIP switches page and reset.
+| Input | Function |
+|---|---|
+| **Up** (hold) | Climb: the core alternates the hands for you |
+| **Left / Right** | Move sideways |
+| **Down** | Both sticks down |
+| **R** | Fire |
+
+**Single Stick Climb** sets how often the hands swap: 24 frames (default), 16, 32 or 40.
+Single-stick climbing is a little slower than climbing with two sticks.
+
+**4-Way Filter** (on by default) keeps diagonals out, as the original 4-way sticks did.
+
+---
+
+## OSD options
+
+| Option | Notes |
+|---|---|
+| Orientation | Vertical (rotated, for a horizontal screen) or Horizontal (for a rotated monitor) |
+| Joysticks / Single Stick Climb / 4-Way Filter | See *Controls* |
+| DIP switches | Coinage, cabinet, demo sound, flip screen, difficulty, lives, bonus life, continue, service (test) mode |
+| Cheats | See below |
+| Advanced → Z80 VRAM Wait | *On (Board)*: the Z80 waits for blanking when it touches tile RAM, as the schematics show. *Off (MAME)*: no waits, as in MAME. |
+| Advanced → SDRAM Read Phase | Leave at **2.5**. Only for troubleshooting garbled graphics. |
+
+**Service mode:** set the *Service Mode* DIP switch On and reset; set it Off and reset to return
+to the game.
+
+**Cheats** (OSD **Cheats** menu): P1/P2 Infinite Lives, P1/P2 Infinite Time and the 3-Way
+Powerup, converted from the MAME cheat file. Like MAME's, they write the value into RAM once per
+frame.
+
+---
+
+## Known issues
+
+- **Stage-clear music keeps playing** into the next stage and the sound effects stop, when the
+  *Infinite Time* cheat is on. The end-of-stage bonus counts the timer down to zero, which the
+  cheat prevents. Still being confirmed; leave Infinite Time off for now.
+- **Single Stick** climbing is slower than climbing with two sticks.
+- The **Fire Trap (US)** and **Fire Trap (Japan)** MRAs have not been tested yet.
 
 ---
 
 ## ROMs
 
-MAME sets `firetrap` (US, rev A), `firetrapa` (US) and `firetrapj` (Japan). Place
-`firetrap.zip` (merged, MAME 0.289) in `games/mame`; the MRA files are in [releases](releases).
+```
+ROMs are not included. Use the MAME "firetrap" set (merged, MAME 0.289).
+
+/_Arcade/Fire Trap (US, rev A).mra
+/_Arcade/Fire Trap (US).mra
+/_Arcade/Fire Trap (Japan).mra
+/_Arcade/cores/FireTrap_YYYYMMDD.rbf
+/games/mame/firetrap.zip
+```
+
 The bootleg `firetrapbl` is not supported.
 
 ---
 
-## Advanced OSD options
+## Compilation
 
-- **Z80 VRAM Wait:** the board makes the Z80 wait for blanking when it touches tile RAM
-  (`On`, default). `Off` behaves like MAME. See docs/hardware.md.
-- **SDRAM Read Phase:** for testing only; leave at `2.5`.
+Quartus Prime Lite 17.0 targeting the DE10-Nano's Cyclone V. Open `Arcade-FireTrap.qpf` and
+compile, or run `./build.sh` to build in Docker. A Verilator simulation, with tools to compare
+frames and audio against MAME, is in `sim/`.
 
 ---
 
 ## Credits
 
-- Core: Usquebagh, with Claude (Anthropic)
-- T80: Daniel Wallner and contributors; jt8051, jtopl, jt5205: Jose Tejada (jotego)
-- 6502: Arlet Ottens; SDRAM controller and MiSTer framework: Sorgelig and the MiSTer-devel team
-- MAME's `firetrap` driver (Nicola Salmoria, Stephane Humbert) as reference
+- **Fire Trap (Arcade):** Wood Place, 1986; licensed in the US by Data East USA
+- **T80 (Z80):** Daniel Wallner and contributors
+- **jt8051, jtopl, jt5205:** Jose Tejada (jotego), from [jtcores](https://github.com/jotego/jtcores)
+- **6502 CPU:** Arlet Ottens
+- **SDRAM controller:** Sorgelig
+- **Cheat engine:** based on Kitrinx's MiSTer cheat code handling, via Martin Donlon's Irem M92 core
+- **Cheats:** converted from the MAME cheat file at [mamecheat.co.uk](https://www.mamecheat.co.uk)
+- **Reference:** MAME `firetrap` driver by Nicola Salmoria and Stephane Humbert, and the
+  schematics in the Data East installation & service manual
+- **MiSTer Platform:** Sorgelig and the MiSTer community
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE).
+GPL-3.0. See individual source files for their respective licenses.

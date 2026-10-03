@@ -1,5 +1,29 @@
 // Fire Trap input helpers for the MiSTer top level (also used by the simulation).
 
+// Coin switch: the 8751 only credits a coin whose switch opens again within 24 frames
+// (longer = jammed coin, ignored). A pad button is easily held longer, so each press becomes
+// a 6-frame pulse, like a real coin mech.
+module ft_coin
+(
+	input      clk,
+	input      frame,     // one pulse per video frame
+	input      button,    // active high
+	output     coin       // active high, 6 frames per press
+);
+
+reg       btn_l;
+reg [2:0] cnt;
+always @(posedge clk) begin
+	btn_l <= button;
+	if (button & ~btn_l)
+		cnt <= 3'd6;
+	else if (frame && cnt != 0)
+		cnt <= cnt - 3'd1;
+end
+assign coin = cnt != 0;
+
+endmodule
+
 // Single-stick mode for one player: the left (only) stick drives both sticks; holding up
 // alternates the hands every n frames so the player climbs.
 module ft_single

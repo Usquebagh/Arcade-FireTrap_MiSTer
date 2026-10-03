@@ -53,7 +53,7 @@ localparam CONF_STR = {
 	"O[5:3],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
 	"O[8],Joysticks,Twin Stick,Single Stick;",
-	"O[14:13],Single Stick Climb,32 Frames,24 Frames,40 Frames;",
+	"O[14:13],Single Stick Climb,24 Frames,16 Frames,32 Frames,40 Frames;",
 	"O[9],4-Way Filter,On,Off;",
 	"-;",
 	"DIP;",
@@ -182,8 +182,9 @@ ft_4way f2l (.clk(clk_sys), .enable(~status[9]), .in(p2_l), .out(p2_lf));
 ft_4way f1r (.clk(clk_sys), .enable(~status[9]), .in(p1_r), .out(p1_rf));
 ft_4way f2r (.clk(clk_sys), .enable(~status[9]), .in(p2_r), .out(p2_rf));
 
-// Single-stick climbing: swap every 32 (default), 24 or 40 frames
-wire [5:0] climb_n = status[14:13] == 2'd1 ? 6'd24 : status[14:13] == 2'd2 ? 6'd40 : 6'd32;
+// Single-stick climbing: swap hands every 24 (default), 16, 32 or 40 frames
+wire [5:0] climb_n = status[14:13] == 2'd1 ? 6'd16 : status[14:13] == 2'd2 ? 6'd32 :
+                     status[14:13] == 2'd3 ? 6'd40 : 6'd24;
 reg vbl_l;
 always @(posedge clk_sys) vbl_l <= vbl;
 wire frame = vbl & ~vbl_l;
@@ -201,7 +202,10 @@ endfunction
 wire [7:0] in0 = stick_port(p1_l4, p1_r4);
 wire [7:0] in1 = stick_port(p2_l4, p2_r4);
 wire [3:0] in2 = ~{joy1[9], joy1[4], joy0[9], joy0[4]};      // start 2, P2 fire, start 1, P1 fire
-wire [2:0] coin = ~{joy1[10], joy0[10], 1'b0};               // coin 2, coin 1, service
+wire coin1, coin2;
+ft_coin c1 (.clk(clk_sys), .frame(frame), .button(joy0[10]), .coin(coin1));
+ft_coin c2 (.clk(clk_sys), .frame(frame), .button(joy1[10]), .coin(coin2));
+wire [2:0] coin = ~{coin2, coin1, 1'b0};                     // coin 2, coin 1, service
 
 ////////////////////   CORE   ///////////////////
 
