@@ -7,8 +7,8 @@ A burning skyscraper and a firefighter with a hose: climb the building hand over
 Climber style, and put out the fires on your way to the top.
 
 <p align="center">
-  <img src="docs/title.png" alt="Fire Trap title screen" height="380">
-  <img src="docs/stage1.png" alt="Fire Trap stage 1" height="380">
+  <img src="docs/cabinet.png" alt="Fire Trap arcade cabinet" height="380">
+  <img src="docs/title.png" alt="Fire Trap running on MiSTer" height="380">
 </p>
 
 > **Early build.** Playable and tested on MiSTer over HDMI; a few issues are still being worked
@@ -59,7 +59,8 @@ one; MiSTer's *Define joystick buttons* only asks for the d-pad and the buttons 
 
 ### Single Stick mode
 
-Set **Joysticks → Single Stick** in the OSD to play with one joystick (or a d-pad):
+The original game needs two joysticks, so this core adds its own **Single Stick** mode for
+playing with one joystick or a d-pad. Set **Joysticks → Single Stick** in the OSD:
 
 | Input | Function |
 |---|---|
@@ -69,7 +70,6 @@ Set **Joysticks → Single Stick** in the OSD to play with one joystick (or a d-
 | **R** | Fire |
 
 **Single Stick Climb** sets how often the hands swap: 24 frames (default), 16, 32 or 40.
-Single-stick climbing is a little slower than climbing with two sticks.
 
 **4-Way Filter** (on by default) keeps diagonals out, as the original 4-way sticks did.
 
@@ -101,8 +101,6 @@ frame. *Infinite Time* stops the music from resetting after a stage clear (see K
   plays while the firefighter descends after clearing a stage keeps playing into the next stage,
   and the sound effects stop. The end-of-stage bonus counts the timer down to zero, which the
   cheat prevents. Without cheats the sound is fine.
-- **Single Stick** climbing is slower than climbing with two sticks.
-- The **Fire Trap (US)** and **Fire Trap (Japan)** MRAs have not been tested yet.
 
 ---
 
