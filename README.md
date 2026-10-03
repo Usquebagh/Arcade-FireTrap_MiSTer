@@ -12,8 +12,18 @@ Climber style, and put out the fires on your way to the top.
 </p>
 
 > **Early build.** Playable and tested on MiSTer over HDMI; a few issues are still being worked
-> on (see [Known issues](#known-issues)). Feedback and bug reports are welcome via
+> on (below). Feedback and bug reports are welcome via
 > [Issues](https://github.com/Usquebagh/Arcade-FireTrap_MiSTer/issues).
+
+## Known issues
+
+- **Sound effects can stop:** sometimes only the music keeps playing and the sound effects go
+  silent, e.g. on stage 2 (seen without cheats). With the *Infinite Time* cheat on it happens
+  reliably after a stage clear: the music for the descent keeps playing into the next stage.
+- **End-of-stage bonus shows wrong digits:** after the landing sequence, the score tally can show
+  values that are not proper decimal numbers (they look like hex).
+
+Both are being investigated.
 
 ---
 
@@ -92,18 +102,6 @@ to the game.
 **Cheats** (OSD **Cheats** menu): P1/P2 Infinite Lives, P1/P2 Infinite Time and the 3-Way
 Powerup, converted from the MAME cheat file. Like MAME's, they write the value into RAM once per
 frame. *Infinite Time* reliably triggers the sound issue in [Known issues](#known-issues).
-
----
-
-## Known issues
-
-- **Sound effects can stop:** sometimes only the music keeps playing and the sound effects go
-  silent, e.g. on stage 2 (seen without cheats). With the *Infinite Time* cheat on it happens
-  reliably after a stage clear: the music for the descent keeps playing into the next stage.
-- **End-of-stage bonus shows wrong digits:** after the landing sequence, the score tally can show
-  values that are not proper decimal numbers (they look like hex).
-
-Both are being investigated.
 
 ---
 
