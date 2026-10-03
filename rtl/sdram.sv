@@ -21,7 +21,8 @@
 module sdram
 (
     input             init,        // reset to initialize RAM
-    input             clk,         // clock 64MHz
+    input             clk,         // clock 48 MHz (Fire Trap: CAS latency 2, refresh every 370 clocks)
+    input             rd_delay,    // 1 = capture read data one clock later (48 MHz + inverted SDRAM clock)
    
     input             doRefresh,
 
@@ -73,13 +74,13 @@ assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 localparam BURST_LENGTH        = 4;
 localparam BURST_CODE          = (BURST_LENGTH == 8) ? 3'b011 : (BURST_LENGTH == 4) ? 3'b010 : (BURST_LENGTH == 2) ? 3'b001 : 3'b000;  // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE         = 1'b0;     // 0=sequential, 1=interleaved
-localparam CAS_LATENCY         = 3'd3;     // 2 for < 100MHz, 3 for >100MHz
+localparam CAS_LATENCY         = 3'd2;     // 2 for < 100MHz, 3 for >100MHz
 localparam OP_MODE             = 2'b00;    // only 00 (standard operation) allowed
 localparam NO_WRITE_BURST      = 1'b1;     // 0= write burst enabled, 1=only single access write
 localparam MODE                = {3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, BURST_CODE};
 
 localparam sdram_startup_cycles= 14'd12100;// 100us, plus a little more, @ 100MHz
-localparam cycles_per_refresh  = 14'd500;  // (64000*64)/8192-1 Calc'd as (64ms @ 64MHz)/8192 rose
+localparam cycles_per_refresh  = 14'd370;  // 64 ms / 8192 rows = 7.8 us = 375 clocks at 48 MHz
 localparam startup_refresh_max = 14'b11111111111111;
 
 // SDRAM commands
@@ -108,7 +109,7 @@ localparam STATE_RFSH    = 10;
 
 
 always @(posedge clk) begin
-    reg [CAS_LATENCY+BURST_LENGTH+1:0] data_ready_delay1, data_ready_delay2, data_ready_delay3, data_ready_delay4;
+    reg [CAS_LATENCY+BURST_LENGTH+2:0] data_ready_delay1, data_ready_delay2, data_ready_delay3, data_ready_delay4;
 
     reg        saved_wr;
     reg [12:0] cas_addr;
@@ -299,10 +300,10 @@ always @(posedge clk) begin
             else begin
                 command <= CMD_READ;
                 state   <= STATE_IDLE_5;
-                     if(ch == 0) data_ready_delay1[CAS_LATENCY+BURST_LENGTH+1] <= 1;
-                else if(ch == 1) data_ready_delay2[CAS_LATENCY+BURST_LENGTH+1] <= 1;
-                else if(ch == 2) data_ready_delay3[CAS_LATENCY+BURST_LENGTH+1] <= 1;
-                else             data_ready_delay4[CAS_LATENCY+BURST_LENGTH+1] <= 1;
+                     if(ch == 0) data_ready_delay1[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
+                else if(ch == 1) data_ready_delay2[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
+                else if(ch == 2) data_ready_delay3[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
+                else             data_ready_delay4[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
             end
         end
       

@@ -64,7 +64,10 @@ reg  [7:0] spr [0:3];
 
 wire [8:0] sx = layer ? bg2_sx : bg1_sx;
 wire [8:0] sy = layer ? bg2_sy : bg1_sy;
-wire [8:0] ty = Y - sy;                  // MAME: scrolly = -register
+// Flip screen: MAME flips tilemaps around the visible area (256 x 256 incl. the 8-line top
+// border), i.e. the map is read at (255 - x, 255 - y); the writer mirrors x.
+wire [8:0] Yb = flip ? 9'd255 - Y : Y;
+wire [8:0] ty = Yb - sy;                 // MAME: scrolly = -register
 wire [4:0] trow = ty[8:4];
 wire [4:0] tcol = sx[8:4] + t;
 // MAME get_bg_memory_offset: ((row & 0xF) ^ 0xF) | (col & 0xF) << 4 | (row & 0x10) << 5 | (col & 0x10) << 6
@@ -119,7 +122,7 @@ always @(posedge clk) begin
     if (rst) begin
         w_busy <= 0;
     end else if (w_busy) begin
-        lb_addr <= {Y[0], wx[7:0]};
+        lb_addr <= {Y[0], (flip & ~w_obj) ? ~wx[7:0] : wx[7:0]};
         if (w_obj) begin
             lb_data   <= {w_pro, w_pal, obj_pix};
             lb_we_obj <= obj_pix != 4'd0;             // sprite X wraps (MAME draws at x and x-256)

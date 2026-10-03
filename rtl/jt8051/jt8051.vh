@@ -25,7 +25,7 @@ reg  [47:0] ucode_rom[0:2**15-1];
 wire [47:0] ucode_data;
 
 initial begin
-    $readmemb("jt8051.uc",ucode_rom);
+    $readmemb("rtl/jt8051/jt8051.uc",ucode_rom);   // Fire Trap: path relative to the project root
 end
 
 assign ucode_data = ucode_rom[uaddr];

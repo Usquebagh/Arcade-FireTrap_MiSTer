@@ -6,11 +6,11 @@ module ft_core #(
     parameter MAIN_ROM_INIT = "",
     parameter MCU_ROM_INIT  = "",
     parameter CHR_INIT      = "",
-    parameter PROM_INIT     = "",
-    parameter VRAM_WAIT     = 1        // Z80 waits for blanking on tile-RAM access (not in MAME)
+    parameter PROM_INIT     = ""
 ) (
     input             clk,             // 48 MHz
     input             reset,
+    input             vram_wait,       // Z80 waits for blanking on tile-RAM access (not in MAME)
 
     // ROM download (MRA layout, docs/hardware.md)
     input      [19:0] dl_addr,
@@ -50,6 +50,10 @@ module ft_core #(
     output            vs,
     output      [8:0] vid_h,
     output      [8:0] vid_v,
+    output            flip_screen,     // F003 (flip DIP / cocktail player 2)
+
+    // Audio
+    output signed [15:0] audio,
 
     // Debug
     output     [15:0] dbg_addr,
@@ -120,12 +124,14 @@ wire hblank_now, vblank_now;
 wire vram_acc = bg1_cs | bg2_cs | fg_cs;
 reg  vram_grant;
 always @(posedge clk)
-    vram_grant <= vram_acc & (vram_grant | hblank_now | vblank_now | (VRAM_WAIT == 0));
-assign wait_n = ~(vram_acc & ~vram_grant & (VRAM_WAIT != 0));
-wire vram_wr = ~wr_n & (vram_grant | (VRAM_WAIT == 0));
+    vram_grant <= vram_acc & (vram_grant | hblank_now | vblank_now | ~vram_wait);
+assign wait_n = ~(vram_acc & ~vram_grant & vram_wait);
+wire vram_wr = ~wr_n & (vram_grant | ~vram_wait);
 
 // ---------------------------------------------------------------- download decode
 wire dl_main = dl_wr & (dl_addr < 20'h18000);
+wire dl_snd  = dl_wr & (dl_addr >= 20'h18000) & (dl_addr < 20'h28000);
+wire [19:0] dl_snd_a = dl_addr - 20'h18000;
 wire dl_mcu  = dl_wr & (dl_addr[19:12] == 8'h28);
 wire dl_chr  = dl_wr & (dl_addr >= 20'h29000) & (dl_addr < 20'h2B000);
 wire dl_prom = dl_wr & (dl_addr >= 20'h2B000) & (dl_addr < 20'h2B300);
@@ -262,6 +268,8 @@ always @(posedge clk) begin
     end
 end
 
+assign flip_screen = flip;
+
 // ---------------------------------------------------------------- interrupts (sheet 15)
 // NMI: the enable is latched at the start of VBLANK; NMI is held for the rest of VBLANK.
 // IRQ: set by a rising edge of 8751 P3.0, cleared by a write to F000.
@@ -341,6 +349,21 @@ always @(*) begin
         endcase
     end
 end
+
+// ---------------------------------------------------------------- sound board
+reg snd_wr;
+always @(posedge clk) snd_wr <= ~reset & io_end & (io_a_l == 4'h1);   // after sound_latch updates
+
+ft_sound u_sound (
+    .clk        ( clk         ),
+    .reset      ( reset       ),
+    .latch_data ( sound_latch ),
+    .latch_wr   ( snd_wr      ),
+    .rom_waddr  ( dl_snd_a[15:0] ),
+    .rom_wdata  ( dl_data     ),
+    .rom_we     ( dl_snd      ),
+    .audio      ( audio       )
+);
 
 // ---------------------------------------------------------------- video
 ft_video #(.CHR_INIT(CHR_INIT), .PROM_INIT(PROM_INIT)) u_video (

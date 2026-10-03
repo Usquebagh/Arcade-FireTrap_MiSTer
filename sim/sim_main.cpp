@@ -85,6 +85,11 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 200; i++) tick();
     top->reset = 0;
 
+    // Audio: 48 kHz (48 MHz / 1000, box-filtered), signed 16-bit mono to audio.raw
+    FILE *audio = fopen("audio.raw", "wb");
+    int64_t audio_acc = 0;
+    int audio_n = 0;
+
     std::vector<uint8_t> fb(W * H * 3, 0);
     int frame = 0;
     bool last_vblank = false, last_m1 = false, overrun_reported = false;
@@ -93,6 +98,13 @@ int main(int argc, char **argv) {
     while (frame < frames) {
         tick();
         cycles++;
+
+        audio_acc += (int16_t)top->audio;
+        if (++audio_n == 1000) {
+            int16_t s = (int16_t)(audio_acc / 1000);
+            fwrite(&s, 2, 1, audio);
+            audio_acc = audio_n = 0;
+        }
 
         if (frame >= pc_from && frame < pc_to) {
             if (top->dbg_m1 && !last_m1) printf("PC %04x\n", top->dbg_addr);
@@ -126,6 +138,7 @@ int main(int argc, char **argv) {
         last_vblank = top->vblank;
     }
 
+    fclose(audio);
     printf("%llu clocks, %.2f s emulated\n", (unsigned long long)cycles, cycles / 48e6);
     delete top;
     return 0;

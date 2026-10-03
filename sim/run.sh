@@ -8,12 +8,15 @@ cd "$(dirname "$0")"
 ROMS=${FT_ROMS:-$HOME/jt/firetrap/roms}
 mkdir -p out/roms
 python3 mkroms.py "$ROMS" out/roms "${FT_SET:-firetrap}" > /dev/null
-cp ../rtl/jt8051/jt8051.uc out/      # jt8051 microcode, $readmemb'd from the working directory
+mkdir -p out/rtl/jt8051
+cp ../rtl/jt8051/jt8051.uc out/rtl/jt8051/   # jt8051 microcode, $readmemb'd relative to the project root
 
 SRC="../rtl/t80/T80s.v
   ../rtl/jt8051/jt8051.v ../rtl/jt8051/jt8051_alu.v ../rtl/jt8051/jt8051_ctrl.v
   ../rtl/jt8051/jt8051_periph.v ../rtl/jt8051/jt8051_regs.v ../rtl/jt8051/jt8051_serial.v
-  ../rtl/dpram.v ../rtl/ft_mcu.v ../rtl/ft_render.v ../rtl/ft_video.v ../rtl/ft_core.v
+  ../rtl/cpu6502/ALU.v ../rtl/cpu6502/cpu.v ../rtl/jt5205/*.v
+  $(ls ../rtl/jtopl/jtopl.v ../rtl/jtopl/jtopl_*.v)
+  ../rtl/dpram.v ../rtl/ft_mcu.v ../rtl/ft_sound.v ../rtl/ft_render.v ../rtl/ft_video.v ../rtl/ft_core.v
   sim_top.v"
 
 # Rebuild only when sources changed

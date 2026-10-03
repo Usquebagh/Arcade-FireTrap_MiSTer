@@ -29,3 +29,6 @@ jtag.cdf
 commit_*.sh
 cleanup.sh
 precheck.sh
+
+# Release builds are uploaded as release assets
+releases/*.rbf

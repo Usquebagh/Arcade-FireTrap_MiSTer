@@ -27,6 +27,7 @@ module sim_top #(
     output        vs,
     output  [8:0] vid_h,
     output  [8:0] vid_v,
+    output signed [15:0] audio,
     output [15:0] dbg_addr,
     output        dbg_m1,
     output        dbg_overrun,
@@ -40,8 +41,8 @@ reg  [63:0] gfx_data;
 wire [15:0] sdw_data;
 wire  [1:0] sdw_be;
 
-ft_core #(.VRAM_WAIT(VRAM_WAIT)) u_core (
-    .clk(clk), .reset(reset),
+ft_core u_core (
+    .clk(clk), .reset(reset), .vram_wait(VRAM_WAIT != 0),
     .dl_addr(dl_addr), .dl_data(dl_data), .dl_wr(dl_wr), .dl_wait(dl_wait),
     .gfx_addr(gfx_addr), .gfx_req(gfx_req), .gfx_ready(gfx_ready), .gfx_data(gfx_data),
     .sdw_addr(sdw_addr), .sdw_data(sdw_data), .sdw_be(sdw_be), .sdw_req(sdw_req), .sdw_ready(sdw_ready),
@@ -49,6 +50,7 @@ ft_core #(.VRAM_WAIT(VRAM_WAIT)) u_core (
     .in0(in0), .in1(in1), .in2(in2), .coin(coin), .dsw0(dsw0), .dsw1(dsw1),
     .ce_pix(ce_pix), .red(red), .green(green), .blue(blue),
     .hblank(hblank), .vblank(vblank), .hs(hs), .vs(vs), .vid_h(vid_h), .vid_v(vid_v),
+    .audio(audio),
     .dbg_addr(dbg_addr), .dbg_m1(dbg_m1), .dbg_overrun(dbg_overrun), .dbg_dump(dbg_dump)
 );
 
