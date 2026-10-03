@@ -21,14 +21,14 @@ SRC="../rtl/t80/T80s.v
 
 # Rebuild only when sources changed
 if [ ! -x obj_dir/Vsim_top ] || [ -n "$(find ../rtl sim_top.v sim_main.cpp run.sh -newer obj_dir/Vsim_top -name '*.*' | head -1)" ] \
-   || [ "$(cat obj_dir/params 2>/dev/null)" != "${VRAM_WAIT}${FT_TRACE_IO}" ]; then
+   || [ "$(cat obj_dir/params 2>/dev/null)" != "${VRAM_WAIT}${FT_TRACE_IO}${GFX_SKEW}" ]; then
 verilator --cc --exe --build -j "$(nproc)" -O3 --x-assign fast --x-initial fast \
   -Wno-fatal -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-UNOPTFLAT -Wno-PINCONNECTEMPTY \
   -Wno-PINMISSING -Wno-MULTIDRIVEN -Wno-COMBDLY -Wno-IMPLICIT \
   --top-module sim_top -DSIMULATION -I../rtl/jt8051 \
-  ${VRAM_WAIT:+-GVRAM_WAIT=$VRAM_WAIT} \
+  ${VRAM_WAIT:+-GVRAM_WAIT=$VRAM_WAIT} ${GFX_SKEW:+-GGFX_SKEW=$GFX_SKEW} \
   -Mdir obj_dir ${FT_TRACE_IO:+-DFT_TRACE_IO} $SRC sim_main.cpp > out/build.log 2>&1 || { grep -E "%Error" out/build.log | head -30; tail -5 out/build.log; exit 1; }
-echo "${VRAM_WAIT}${FT_TRACE_IO}" > obj_dir/params
+echo "${VRAM_WAIT}${FT_TRACE_IO}${GFX_SKEW}" > obj_dir/params
 grep -E "%Warning" out/build.log | grep -v -E "t80/|jt8051" | head -20 || true
 fi
 

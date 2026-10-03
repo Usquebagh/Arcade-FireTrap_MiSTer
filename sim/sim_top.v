@@ -2,7 +2,8 @@
 // (same request/ready handshake as rtl/sdram.sv: one-clock request pulse, ready pulse).
 module sim_top #(
     parameter VRAM_WAIT = 1,
-    parameter GFX_LAT   = 10      // clocks from request to data, as the 48 MHz controller
+    parameter GFX_LAT   = 10,     // clocks from request to data, as the 48 MHz controller
+    parameter GFX_SKEW  = 0       // debug: 1 = burst captured one word late, 2 = one word early
 ) (
     input         clk,
     input         reset,
@@ -67,7 +68,12 @@ always @(posedge clk) begin
     end else if (rd_cnt != 0) begin
         rd_cnt <= rd_cnt - 5'd1;
         if (rd_cnt == 5'd1) begin
-            gfx_data  <= {mem[rd_a + 3], mem[rd_a + 2], mem[rd_a + 1], mem[rd_a]};
+            if (GFX_SKEW == 1)       // late: word n gets word n+1, the last one the bus after the burst
+                gfx_data <= {16'hffff, mem[rd_a + 3], mem[rd_a + 2], mem[rd_a + 1]};
+            else if (GFX_SKEW == 2)  // early: word 0 gets whatever was on the bus before
+                gfx_data <= {mem[rd_a + 2], mem[rd_a + 1], mem[rd_a], 16'hffff};
+            else
+                gfx_data <= {mem[rd_a + 3], mem[rd_a + 2], mem[rd_a + 1], mem[rd_a]};
             gfx_ready <= 1;
         end
     end

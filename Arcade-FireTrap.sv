@@ -60,7 +60,7 @@ localparam CONF_STR = {
 	"P1,Advanced;",
 	"P1-;",
 	"P1O[10],Z80 VRAM Wait,On (Board),Off (MAME);",
-	"P1O[11],SDRAM Read Delay,+1 Clock,None;",
+	"P1O[12:11],SDRAM Read Phase,2.5,2.0,3.0,3.5;",
 	"-;",
 	"R[0],Reset;",
 	"J1,Fire,R-Stick Up,R-Stick Down,R-Stick Left,R-Stick Right,Start,Coin;",
@@ -239,7 +239,8 @@ sdram sdram
 (
 	.init(~pll_locked),
 	.clk(clk_sys),
-	.rd_delay(~status[11]),
+	// OSD order 2.5 (default), 2.0, 3.0, 3.5 clocks -> controller phase 1, 0, 2, 3
+	.rd_phase(status[12:11] == 2'd0 ? 2'd1 : status[12:11] == 2'd1 ? 2'd0 : status[12:11]),
 	.doRefresh(1'b0),
 
 	.SDRAM_DQ(SDRAM_DQ),

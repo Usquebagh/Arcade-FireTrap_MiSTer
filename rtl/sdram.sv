@@ -22,7 +22,9 @@ module sdram
 (
     input             init,        // reset to initialize RAM
     input             clk,         // clock 48 MHz (Fire Trap: CAS latency 2, refresh every 370 clocks)
-    input             rd_delay,    // 1 = capture read data one clock later (48 MHz + inverted SDRAM clock)
+    input       [1:0] rd_phase,    // read capture point after the READ command: 0 = 2.0, 1 = 2.5,
+                                   // 2 = 3.0, 3 = 3.5 clocks (half steps use the falling edge).
+                                   // On the DE10-nano at 48 MHz, 3.0 captures one word late.
    
     input             doRefresh,
 
@@ -108,8 +110,15 @@ localparam STATE_IDLE_5  = 9;
 localparam STATE_RFSH    = 10;
 
 
+// Read capture: rising-edge sample (dq_reg <= DQ) or the preceding falling-edge sample
+// (dq_reg <= dq_neg, half a clock earlier), and when the result is taken from dq_reg.
+wire [1:0] rd_delay = rd_phase == 2'd0 ? 2'd0 : rd_phase == 2'd3 ? 2'd2 : 2'd1;   // + CL+BL
+wire       use_neg  = rd_phase[0];
+reg [15:0] dq_neg;
+always @(negedge clk) dq_neg <= SDRAM_DQ;
+
 always @(posedge clk) begin
-    reg [CAS_LATENCY+BURST_LENGTH+2:0] data_ready_delay1, data_ready_delay2, data_ready_delay3, data_ready_delay4;
+    reg [CAS_LATENCY+BURST_LENGTH+3:0] data_ready_delay1, data_ready_delay2, data_ready_delay3, data_ready_delay4;
 
     reg        saved_wr;
     reg [12:0] cas_addr;
@@ -157,7 +166,7 @@ always @(posedge clk) begin
     data_ready_delay3 <= data_ready_delay3>>1;
     data_ready_delay4 <= data_ready_delay4>>1;
 
-    dq_reg <= SDRAM_DQ;
+    dq_reg <= use_neg ? dq_neg : SDRAM_DQ;
 
     if(data_ready_delay1[4]) ch1_dout[15:00] <= dq_reg;
     if(data_ready_delay1[3]) ch1_dout[31:16] <= dq_reg;
@@ -300,10 +309,10 @@ always @(posedge clk) begin
             else begin
                 command <= CMD_READ;
                 state   <= STATE_IDLE_5;
-                     if(ch == 0) data_ready_delay1[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
-                else if(ch == 1) data_ready_delay2[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
-                else if(ch == 2) data_ready_delay3[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
-                else             data_ready_delay4[CAS_LATENCY+BURST_LENGTH+1+rd_delay] <= 1;
+                     if(ch == 0) data_ready_delay1[CAS_LATENCY+BURST_LENGTH+rd_delay] <= 1;
+                else if(ch == 1) data_ready_delay2[CAS_LATENCY+BURST_LENGTH+rd_delay] <= 1;
+                else if(ch == 2) data_ready_delay3[CAS_LATENCY+BURST_LENGTH+rd_delay] <= 1;
+                else             data_ready_delay4[CAS_LATENCY+BURST_LENGTH+rd_delay] <= 1;
             end
         end
       

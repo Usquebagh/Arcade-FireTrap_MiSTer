@@ -58,7 +58,7 @@ The bootleg `firetrapbl` is not supported.
 
 - **Z80 VRAM Wait:** the board makes the Z80 wait for blanking when it touches tile RAM
   (`On`, default). `Off` behaves like MAME. See docs/hardware.md.
-- **SDRAM Read Delay:** for testing only; leave at `+1 Clock`.
+- **SDRAM Read Phase:** for testing only; leave at `2.5`.
 
 ---
 
