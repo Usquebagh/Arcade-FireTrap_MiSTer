@@ -91,16 +91,19 @@ to the game.
 
 **Cheats** (OSD **Cheats** menu): P1/P2 Infinite Lives, P1/P2 Infinite Time and the 3-Way
 Powerup, converted from the MAME cheat file. Like MAME's, they write the value into RAM once per
-frame. *Infinite Time* stops the music from resetting after a stage clear (see Known issues).
+frame. *Infinite Time* reliably triggers the sound issue in [Known issues](#known-issues).
 
 ---
 
 ## Known issues
 
-- **Cheats can break the music after a stage clear:** with *Infinite Time* on, the music that
-  plays while the firefighter descends after clearing a stage keeps playing into the next stage,
-  and the sound effects stop. The end-of-stage bonus counts the timer down to zero, which the
-  cheat prevents. Without cheats the sound is fine.
+- **Sound effects can stop:** sometimes only the music keeps playing and the sound effects go
+  silent, e.g. on stage 2 (seen without cheats). With the *Infinite Time* cheat on it happens
+  reliably after a stage clear: the music for the descent keeps playing into the next stage.
+- **End-of-stage bonus shows wrong digits:** after the landing sequence, the score tally can show
+  values that are not proper decimal numbers (they look like hex).
+
+Both are being investigated.
 
 ---
 
