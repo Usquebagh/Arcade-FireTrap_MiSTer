@@ -17,11 +17,11 @@ Climber style, and put out the fires on your way to the top.
 
 ## Known issues
 
-- **Sound effects can stop:** sometimes only the music keeps playing and the sound effects go
-  silent, e.g. on stage 2 (seen without cheats). With the *Infinite Time* cheat on it happens
+- **Sound is glitchy:** sometimes the effects drop out and go silent until level start.
+  e.g. on stage 2 (seen without cheats). With the *Infinite Time* cheat on it happens
   reliably after a stage clear: the music for the descent keeps playing into the next stage.
-- **End-of-stage bonus shows wrong digits:** after the landing sequence, the score tally can show
-  values that are not proper decimal numbers (they look like hex).
+- **End-of-stage tally shows wrong digits:** after the landing sequence, the score can show
+  values that are not proper decimal numbers.
 
 Both are being investigated.
 
