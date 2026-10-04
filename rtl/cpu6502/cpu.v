@@ -1215,8 +1215,12 @@ reg NMI_1 = 0;          // delayed NMI signal
 always @(posedge clk)
     NMI_1 <= NMI;
 
+// Modified: clear the captured edge on the enabled clock that leaves BRK2, which is when the
+// NMI vector is chosen. The original cleared it in BRK3; with RDY used as a clock enable BRK3
+// lasts many clocks, so an NMI arriving while an IRQ was being entered (IRQ vector already
+// chosen) was captured and then cleared again without being serviced - a lost sound command.
 always @(posedge clk )
-    if( NMI_edge && state == BRK3 )
+    if( NMI_edge && state == BRK2 && RDY )
         NMI_edge <= 0;
     else if( NMI & ~NMI_1 )
         NMI_edge <= 1;

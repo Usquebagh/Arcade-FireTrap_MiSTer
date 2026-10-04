@@ -30,3 +30,5 @@ commit_*.sh
 cleanup.sh
 precheck.sh
 
+sim/cpu/out/
+sim/snd/out/

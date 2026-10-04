@@ -104,6 +104,10 @@ always @(posedge clk) begin
         irq_ff  <= 0;
         nib_sel <= 0;
     end else begin
+`ifdef FT_TRACE_SND
+        if (latch_wr) $display("SND CMD %02x%s", latch_data, nmi_ff ? " (previous not read yet)" : "");
+        if (rd & sel_rd3 & (ab[11:10] == 2'b01)) $display("SND READ %02x", latch_data);
+`endif
         if (latch_wr) nmi_ff <= 1;
         if (rd & sel_rd3 & (ab[11:10] == 2'b01)) nmi_ff <= 0;
 
