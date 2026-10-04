@@ -32,3 +32,5 @@ precheck.sh
 
 sim/cpu/out/
 sim/snd/out/
+sim/snd/jtopl.raw
+sim/snd/opl_wr.log
